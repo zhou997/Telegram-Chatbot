@@ -23,14 +23,14 @@ jobs:
       uses: docker/login-action@v2
       with:
         registry: https://zhou997.azurecr.io/
-        username: ${{ secrets.AzureAppService_ContainerUsername_a88abac64a9c4745b4d04a9f85c5d07d }}
-        password: ${{ secrets.AzureAppService_ContainerPassword_e3b1da8d3baa4c0ebc12cbf7708245a4 }}
+        username: ${{ secrets.AzureAppService_ContainerUsername_e5257fa3ad8f4b2baa0c217384aeb439 }}
+        password: ${{ secrets.AzureAppService_ContainerPassword_c9f2f1ab65b644b2a7571b643756b06a }}
 
     - name: Build and push container image to registry
       uses: docker/build-push-action@v3
       with:
         push: true
-        tags: zhou997.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_a88abac64a9c4745b4d04a9f85c5d07d }}/tgchabot:${{ github.sha }}
+        tags: zhou997.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_e5257fa3ad8f4b2baa0c217384aeb439 }}/tgchabot:${{ github.sha }}
         file: ./Dockerfile
 
   deploy:
@@ -47,5 +47,5 @@ jobs:
       with:
         app-name: 'chatbot-zhou997'
         slot-name: 'production'
-        publish-profile: ${{ secrets.AzureAppService_PublishProfile_7ff9ee312d194317af2cd4527d1770a0 }}
-        images: 'zhou997.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_a88abac64a9c4745b4d04a9f85c5d07d }}/tgchabot:${{ github.sha }}'
+        publish-profile: ${{ secrets.AzureAppService_PublishProfile_90919291e4eb4c56baf7c2134c86ac6a }}
+        images: 'zhou997.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_e5257fa3ad8f4b2baa0c217384aeb439 }}/tgchabot:${{ github.sha }}'
