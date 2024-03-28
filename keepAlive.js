@@ -1,1 +1,1 @@
-require('azure-app-service-keepalive').keepalive();
+require('azure-app-service-keepalive').keepalive(8000);
