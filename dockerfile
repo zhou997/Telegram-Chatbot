@@ -4,7 +4,8 @@ WORKDIR /chatbot
 ADD . /chatbot
 RUN pip install update
 RUN pip install -r requirements.txt
-
-EXPOSE 8000
-
-ENTRYPOINT python chatbot.py
+RUN apt-get update && \
+ apt-get install -y \
+    nodejs npm
+RUN npm i azure-app-service-keepalive
+ENTRYPOINT python chatbot.py ; node keepAlive.js
