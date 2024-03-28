@@ -47,6 +47,3 @@ def hello(update: Update, context: CallbackContext) -> None:
     except (IndexError, ValueError):
         update.message.reply_text('Usage: /hello <keyword>')
 
-
-if __name__ == '__main__':
-    main()
