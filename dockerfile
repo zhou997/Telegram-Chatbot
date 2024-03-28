@@ -6,5 +6,5 @@ RUN pip install update
 RUN pip install -r requirements.txt
 RUN chmod +x ./entrypoint.sh
 
-EXPOSE 80
+EXPOSE 8000
 ENTRYPOINT ["./entrypoint.sh"]
