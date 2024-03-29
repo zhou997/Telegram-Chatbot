@@ -3,12 +3,13 @@ import os
 
 import mysql.connector
 from mysql.connector import errorcode
-
+from dotenv import load_dotenv
+load_dotenv()
 # Obtain connection string information from the portal
 config = {
-    'host': os.environ['MYSQL_HOST'],
-    'user': os.environ['MYSQL_USER'],
-    'password': os.environ['MYSQL_PASSWORD'],
+    'host': os.getenv('MYSQL_HOST'),
+    'user': os.getenv('MYSQL_USER'),
+    'password': os.getenv('MYSQL_PASSWORD'),
     'database': 'chatbot'
 }
 

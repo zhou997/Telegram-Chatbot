@@ -3,7 +3,8 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                           CallbackContext)
 import logging, os
 from ChatGPTHKBU import ChatGPTHKBU
-
+from dotenv import load_dotenv
+load_dotenv()
 
 def equiped_chatgpt(update, context):
     global chatgpt
@@ -14,7 +15,7 @@ def equiped_chatgpt(update, context):
 
 
 def main():
-    updater = Updater(token=(os.environ['TELEGRAM_ACCESS_TOKEN']), use_context=True)
+    updater = Updater(token=(os.getenv('TELEGRAM_ACCESS_TOKEN')), use_context=True)
     dispatcher = updater.dispatcher
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                         level=logging.INFO)
