@@ -1,3 +1,4 @@
+import logging
 import os
 
 import mysql.connector
@@ -13,13 +14,13 @@ config = {
 
 try:
     conn = mysql.connector.connect(**config)
-    print("Connection established")
+    logging.info("Connection established")
 except mysql.connector.Error as err:
     if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-        print("Something is wrong with the user name or password")
+        logging.info("Something is wrong with the user name or password")
     elif err.errno == errorcode.ER_BAD_DB_ERROR:
-        print("Database does not exist")
+        logging.info("Database does not exist")
     else:
-        print(err)
+        logging.info(err)
 else:
     cursor = conn.cursor()
