@@ -54,7 +54,7 @@ async def hello(update: Update, context: CallbackContext) -> None:
 
 async def top(update: Update, context: CallbackContext) -> None:
     try:
-        result = await db_pool.execute_query("SELECT * FROM media_content order by rating desc limit 10 ")
+        result = await db_pool.execute_query("SELECT * FROM media_content order by rating desc limit 5")
         if result:
             reply_message = convert_to_human_readable(result)
         else:
