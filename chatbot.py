@@ -54,7 +54,7 @@ async def hello(update: Update, context: CallbackContext) -> None:
 
 async def top(update: Update, context: CallbackContext) -> None:
     try:
-        result = await db_pool.execute_query("SELECT * FROM media_content")
+        result = await db_pool.execute_query("SELECT * FROM media_content order by rating desc limit 10 ")
         if result:
             reply_message = convert_to_human_readable(result)
         else:
@@ -71,7 +71,7 @@ def convert_to_human_readable(data):
     for item in data:
         result += f"Title: {item[1]}\n"
         result += f"Year: {item[2]}\n"
-        result += f"Category ID: {'Movie' if item[3] == 0 else 'TV Series'}\n"
+        result += f"Category ID: {'Movie' if item[3] == 1 else 'TV Series'}\n"
         result += f"Genre: {item[4]}\n"
         result += f"Description: {item[5]}\n"
         result += f"Rating: {item[6]}\n\n"
