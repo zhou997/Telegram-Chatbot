@@ -14,12 +14,29 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 db_pool = Database()
 
 
-async def equiped_chatgpt(update, context):
+async def equiped_chatgpt(update, context, is_free_chat=False):
+    await db_pool.check_if_user_exists(update.message)
     global chatgpt
-    reply_message = chatgpt.submit(update.message.text)
-    logging.info("Update: " + str(update))
-    logging.info("context: " + str(context))
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
+    if prompt_filter(update.message.text) or is_free_chat:
+        reply_message = chatgpt.submit(update.message.text)
+        logging.info("Update: " + str(update))
+        logging.info("context: " + str(context))
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
+    else:
+        await context.bot.send_message(chat_id=update.effective_chat.id,
+                                       text="Opps, No data found for the message.\nPlease ask Movie or TV related questions.")
+
+
+def prompt_filter(text):
+    global chatgpt
+    reply = chatgpt.submit(
+        f"\"{text}\" is this text related to tv show or movie. you only need to reply yes if it is, reply no if it don't")
+    if ("Yes" or "yes") in reply:
+        return True
+    if ("No" or "no") in reply:
+        return False
+    else:
+        return False
 
 
 def main():
@@ -27,6 +44,7 @@ def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("hello", hello))
     app.add_handler(CommandHandler("top", top))
+    app.add_handler(CommandHandler("start", start))
 
     global chatgpt
     chatgpt = ChatGPTHKBU()
@@ -38,11 +56,13 @@ def main():
 
 
 async def help_command(update: Update, context: CallbackContext) -> None:
+    await db_pool.check_if_user_exists(update.message)
     """Send a message when the command /help is issued."""
     await update.message.reply_text('Helping you helping you.')
 
 
 async def hello(update: Update, context: CallbackContext) -> None:
+    await db_pool.check_if_user_exists(update.message)
     try:
         reply_message = r"Good day, " + context.args[0] + r"!"
         logging.info("Update: " + str(update))
@@ -53,6 +73,7 @@ async def hello(update: Update, context: CallbackContext) -> None:
 
 
 async def top(update: Update, context: CallbackContext) -> None:
+    await db_pool.check_if_user_exists(update.message)
     try:
         result = await db_pool.execute_query("SELECT * FROM media_content order by rating desc limit 5")
         if result:
@@ -77,6 +98,10 @@ def convert_to_human_readable(data):
         result += f"Rating: {item[6]}\n\n"
     return result
 
+async def start(update: Update, context: CallbackContext):
+    await db_pool.check_if_user_exists(update.message)
+    reply_text = "Greeting! I'm a Movie & TV info chatbot 🤖\n\n"
+    await update.message.reply_text(reply_text)
 
 if __name__ == '__main__':
     main()
