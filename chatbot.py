@@ -1,6 +1,7 @@
 from telegram import Update
 from telegram.ext import (CommandHandler, MessageHandler,
                           CallbackContext, ApplicationBuilder, filters)
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import logging, os
 from ChatGPTHKBU import ChatGPTHKBU
 from dotenv import load_dotenv
@@ -45,6 +46,8 @@ def main():
     app.add_handler(CommandHandler("hello", hello))
     app.add_handler(CommandHandler("top", top))
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler('search', search))
+    app.add_handler(CommandHandler('searchID', searchID))
 
     global chatgpt
     chatgpt = ChatGPTHKBU()
@@ -85,6 +88,47 @@ async def top(update: Update, context: CallbackContext) -> None:
         await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
     except (IndexError, ValueError):
         await update.message.reply_text('Usage: /top')
+
+
+async def searchID(update: Update, context: CallbackContext) -> None:
+    media_id = ' '.join(context.args)
+
+    # Query the database for the movie information based on the movie name
+    query = f"SELECT * FROM media_content WHERE id = '{media_id}'"
+    result = await db_pool.execute_query(query)
+    reply_message = convert_to_human_readable(result)
+    logging.info("Update: " + str(update))
+    logging.info("context: " + str(context))
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
+
+
+async def search(update: Update, context: CallbackContext) -> None:
+    media_name = ' '.join(context.args)
+
+    # Query the database for the movie information based on the movie name
+    query = f"SELECT * FROM media_content WHERE title LIKE '%{media_name}%'"
+    result = await db_pool.execute_query(query)
+
+    if len(result) == 1:
+        reply_message = convert_to_human_readable(result)
+    elif len(result) == 0:
+        reply_message = 'Movie not found'
+    else:
+
+        multiple = f"SELECT id,title,release_year,rating FROM media_content WHERE title LIKE '%{media_name}%'"
+        multiple_result = await db_pool.execute_query(multiple)
+        message=""
+        buttons = []
+        for item in multiple_result:
+            message += f"id: {item[0]}, Title: {item[1]}, Year: {item[2]}, Rating: {item[3]}\n\n"
+            buttons.append([InlineKeyboardButton((item[0]), callback_data=str(item))])
+        reply_markup = InlineKeyboardMarkup(buttons)
+        reply_message = f"Multiple movies found. Please choose one:\n {message}\n use /searchID"
+
+
+    logging.info("Update: " + str(update))
+    logging.info("context: " + str(context))
+    await update.message.reply_text(reply_message, reply_markup=reply_markup)
 
 
 def convert_to_human_readable(data):
