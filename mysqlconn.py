@@ -1,27 +1,36 @@
-import logging
+import asyncio
 import os
-
-import mysql.connector
-from mysql.connector import errorcode
 from dotenv import load_dotenv
-load_dotenv()
-# Obtain connection string information from the portal
-config = {
-    'host': os.getenv('MYSQL_HOST'),
-    'user': os.getenv('MYSQL_USER'),
-    'password': os.getenv('MYSQL_PASSWORD'),
-    'database': 'chatbot'
-}
+from mysql.connector.pooling import MySQLConnectionPool
 
-try:
-    conn = mysql.connector.connect(**config)
-    logging.info("Connection established")
-except mysql.connector.Error as err:
-    if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-        logging.info("Something is wrong with the user name or password")
-    elif err.errno == errorcode.ER_BAD_DB_ERROR:
-        logging.info("Database does not exist")
-    else:
-        logging.info(err)
-else:
-    cursor = conn.cursor()
+load_dotenv()
+
+
+class Database:
+    def __init__(self):
+        self.config = {
+            'host': os.getenv('MYSQL_HOST'),
+            'user': os.getenv('MYSQL_USER'),
+            'password': os.getenv('MYSQL_PASSWORD'),
+            'database': 'chatbot'
+        }
+        self.pool = MySQLConnectionPool(pool_name='myPool',
+                                        pool_size=10,
+                                        **self.config)
+
+    def get_connection(self):
+        return self.pool.get_connection()
+
+    async def execute_query(self, query):
+        db_conn = self.pool.get_connection()
+        cursor = db_conn.cursor()
+        try:
+            await asyncio.get_event_loop().run_in_executor(None, cursor.execute, query)
+            result = await asyncio.get_event_loop().run_in_executor(None, cursor.fetchall)
+            return result
+        except Exception as err:
+            print(f"An error occurred: {err}")
+            return None
+        finally:
+            cursor.close()
+            db_conn.close()
