@@ -1,52 +1,51 @@
 from telegram import Update
-from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
-                          CallbackContext)
+from telegram.ext import (CommandHandler, MessageHandler,
+                          CallbackContext, ApplicationBuilder, filters)
 import logging, os
 from ChatGPTHKBU import ChatGPTHKBU
 from dotenv import load_dotenv
+
 load_dotenv()
 
-def equiped_chatgpt(update, context):
+
+async def equiped_chatgpt(update, context):
     global chatgpt
     reply_message = chatgpt.submit(update.message.text)
     logging.info("Update: " + str(update))
     logging.info("context: " + str(context))
-    context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
 
 
 def main():
-    updater = Updater(token=(os.getenv('TELEGRAM_ACCESS_TOKEN')), use_context=True)
-    dispatcher = updater.dispatcher
-    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                        level=logging.INFO)
-
-    dispatcher.add_handler(CommandHandler("help", help_command))
-    dispatcher.add_handler(CommandHandler("hello", hello))
-
-    # dispatcher for chatgpt
+    app = ApplicationBuilder().token(os.getenv('TELEGRAM_ACCESS_TOKEN')).concurrent_updates(True).build()
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("hello", hello))
     global chatgpt
     chatgpt = ChatGPTHKBU()
-    chatgpt_handler = MessageHandler(Filters.text & (~Filters.command),
+    chatgpt_handler = MessageHandler(filters.TEXT & (~filters.COMMAND),
                                      equiped_chatgpt)
-    dispatcher.add_handler(chatgpt_handler)
+    app.add_handler(chatgpt_handler)
+    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                        level=logging.INFO)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
     # To start the bot:
-    updater.start_polling()
-    updater.idle()
+    app.run_polling()
 
 
-def help_command(update: Update, context: CallbackContext) -> None:
+async def help_command(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /help is issued."""
-    update.message.reply_text('Helping you helping you.')
+    await update.message.reply_text('Helping you helping you.')
 
 
-def hello(update: Update, context: CallbackContext) -> None:
+async def hello(update: Update, context: CallbackContext) -> None:
     try:
         reply_message = r"Good day, " + context.args[0] + r"!"
         logging.info("Update: " + str(update))
         logging.info("context: " + str(context))
-        context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
     except (IndexError, ValueError):
-        update.message.reply_text('Usage: /hello <keyword>')
+        await update.message.reply_text('Usage: /hello <keyword>')
 
 
 if __name__ == '__main__':
