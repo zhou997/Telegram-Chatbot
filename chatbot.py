@@ -1,6 +1,6 @@
 from telegram import Update
 from telegram.ext import (CommandHandler, MessageHandler,
-                          CallbackContext, ApplicationBuilder, filters)
+                          CallbackContext, ApplicationBuilder, filters, CallbackQueryHandler)
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import logging, os
 from ChatGPTHKBU import ChatGPTHKBU
@@ -48,6 +48,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler('search', search))
     app.add_handler(CommandHandler('searchID', searchID))
+    app.add_handler(CallbackQueryHandler(button))
 
     global chatgpt
     chatgpt = ChatGPTHKBU()
@@ -109,12 +110,13 @@ async def search(update: Update, context: CallbackContext) -> None:
     query = f"SELECT * FROM media_content WHERE title LIKE '%{media_name}%'"
     result = await db_pool.execute_query(query)
 
-    if len(result) == 1:
+    if media_name and len(result) == 1:
         reply_message = convert_to_human_readable(result)
-    elif len(result) == 0:
+        reply_markup=None
+    elif media_name and len(result) == 0:
         reply_message = 'Movie not found'
-    else:
-
+        reply_markup=None
+    elif media_name and len(result) > 1:
         multiple = f"SELECT id,title,release_year,rating FROM media_content WHERE title LIKE '%{media_name}%'"
         multiple_result = await db_pool.execute_query(multiple)
         message=""
@@ -123,13 +125,26 @@ async def search(update: Update, context: CallbackContext) -> None:
             message += f"id: {item[0]}, Title: {item[1]}, Year: {item[2]}, Rating: {item[3]}\n\n"
             buttons.append([InlineKeyboardButton((item[0]), callback_data=str(item))])
         reply_markup = InlineKeyboardMarkup(buttons)
-        reply_message = f"Multiple movies found. Please choose one:\n {message}\n use /searchID"
+        reply_message = f"Multiple movies found. Please choose one:\n {message}\n choose:"
+    else:
+        await update.message.reply_text("Please provide a movie name to search.")
 
 
     logging.info("Update: " + str(update))
     logging.info("context: " + str(context))
     await update.message.reply_text(reply_message, reply_markup=reply_markup)
 
+
+async def button(update, context):
+    query = update.callback_query
+    selected_data = query.data
+    selected_data = selected_data.strip('()')
+    selected_data=selected_data.split(',')
+    info = f"SELECT * FROM media_content WHERE id = '{int(selected_data[0])}'"
+    result = await db_pool.execute_query(info)
+    reply_message = convert_to_human_readable(result)
+    await query.answer()
+    await query.edit_message_text(text=f"Movie of your choice:\n{reply_message}")
 
 def convert_to_human_readable(data):
     result = ""
@@ -139,7 +154,8 @@ def convert_to_human_readable(data):
         result += f"Category ID: {'Movie' if item[3] == 1 else 'TV Series'}\n"
         result += f"Genre: {item[4]}\n"
         result += f"Description: {item[5]}\n"
-        result += f"Rating: {item[6]}\n\n"
+        result += f"Rating: {item[6]}\n"
+        result += f"poster: {item[7]}\n\n"
     return result
 
 async def start(update: Update, context: CallbackContext):
