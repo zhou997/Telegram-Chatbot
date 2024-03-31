@@ -48,7 +48,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler('search', search))
     app.add_handler(CommandHandler('searchID', searchID))
-    app.add_handler(CallbackQueryHandler(button))
+    app.add_handler(CallbackQueryHandler(multiple_button))
 
     global chatgpt
     chatgpt = ChatGPTHKBU()
@@ -135,7 +135,7 @@ async def search(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(reply_message, reply_markup=reply_markup)
 
 
-async def button(update, context):
+async def multiple_button(update, context):
     query = update.callback_query
     selected_data = query.data
     selected_data = selected_data.strip('()')
