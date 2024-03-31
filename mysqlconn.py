@@ -34,3 +34,25 @@ class Database:
         finally:
             cursor.close()
             db_conn.close()
+
+    async def check_if_user_exists(self, message):
+        user = message.from_user
+        db_conn = self.pool.get_connection()
+        cursor = db_conn.cursor()
+        try:
+            sql = "SELECT * FROM users WHERE tg_user_id=%s"
+            cursor.execute(sql, (user.id,))
+            cursor.fetchall()
+            if cursor.rowcount > 0:
+                return True
+            else:
+                sql2 = "Insert Into users(tg_user_id, last_name, first_name, username, chat_id) values(%s, %s, %s, %s, %s)"
+                cursor.execute(sql2, (user.id, user.last_name, user.first_name, user.name, message.chat_id))
+                db_conn.commit()
+                return False
+        except Exception as err:
+            print(f"An error occurred: {err}")
+            return None
+        finally:
+            cursor.close()
+            db_conn.close()

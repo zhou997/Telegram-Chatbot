@@ -1,6 +1,7 @@
 from telegram import Update
 from telegram.ext import (CommandHandler, MessageHandler,
                           CallbackContext, ApplicationBuilder, filters)
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import logging, os
 from ChatGPTHKBU import ChatGPTHKBU
 from dotenv import load_dotenv
@@ -14,12 +15,29 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 db_pool = Database()
 
 
-async def equiped_chatgpt(update, context):
+async def equiped_chatgpt(update, context, is_free_chat=False):
+    await db_pool.check_if_user_exists(update.message)
     global chatgpt
-    reply_message = chatgpt.submit(update.message.text)
-    logging.info("Update: " + str(update))
-    logging.info("context: " + str(context))
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
+    if prompt_filter(update.message.text) or is_free_chat:
+        reply_message = chatgpt.submit(update.message.text)
+        logging.info("Update: " + str(update))
+        logging.info("context: " + str(context))
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
+    else:
+        await context.bot.send_message(chat_id=update.effective_chat.id,
+                                       text="Opps, No data found for the message.\nPlease ask Movie or TV related questions.")
+
+
+def prompt_filter(text):
+    global chatgpt
+    reply = chatgpt.submit(
+        f"\"{text}\" is this text related to tv show or movie. you only need to reply yes if it is, reply no if it don't")
+    if ("Yes" or "yes") in reply:
+        return True
+    if ("No" or "no") in reply:
+        return False
+    else:
+        return False
 
 
 def main():
@@ -27,6 +45,9 @@ def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("hello", hello))
     app.add_handler(CommandHandler("top", top))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler('search', search))
+    app.add_handler(CommandHandler('searchID', searchID))
 
     global chatgpt
     chatgpt = ChatGPTHKBU()
@@ -38,11 +59,13 @@ def main():
 
 
 async def help_command(update: Update, context: CallbackContext) -> None:
+    await db_pool.check_if_user_exists(update.message)
     """Send a message when the command /help is issued."""
     await update.message.reply_text('Helping you helping you.')
 
 
 async def hello(update: Update, context: CallbackContext) -> None:
+    await db_pool.check_if_user_exists(update.message)
     try:
         reply_message = r"Good day, " + context.args[0] + r"!"
         logging.info("Update: " + str(update))
@@ -53,8 +76,9 @@ async def hello(update: Update, context: CallbackContext) -> None:
 
 
 async def top(update: Update, context: CallbackContext) -> None:
+    await db_pool.check_if_user_exists(update.message)
     try:
-        result = await db_pool.execute_query("SELECT * FROM media_content order by rating desc limit 10 ")
+        result = await db_pool.execute_query("SELECT * FROM media_content order by rating desc limit 5")
         if result:
             reply_message = convert_to_human_readable(result)
         else:
@@ -64,6 +88,47 @@ async def top(update: Update, context: CallbackContext) -> None:
         await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
     except (IndexError, ValueError):
         await update.message.reply_text('Usage: /top')
+
+
+async def searchID(update: Update, context: CallbackContext) -> None:
+    media_id = ' '.join(context.args)
+
+    # Query the database for the movie information based on the movie name
+    query = f"SELECT * FROM media_content WHERE id = '{media_id}'"
+    result = await db_pool.execute_query(query)
+    reply_message = convert_to_human_readable(result)
+    logging.info("Update: " + str(update))
+    logging.info("context: " + str(context))
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
+
+
+async def search(update: Update, context: CallbackContext) -> None:
+    media_name = ' '.join(context.args)
+
+    # Query the database for the movie information based on the movie name
+    query = f"SELECT * FROM media_content WHERE title LIKE '%{media_name}%'"
+    result = await db_pool.execute_query(query)
+
+    if len(result) == 1:
+        reply_message = convert_to_human_readable(result)
+    elif len(result) == 0:
+        reply_message = 'Movie not found'
+    else:
+
+        multiple = f"SELECT id,title,release_year,rating FROM media_content WHERE title LIKE '%{media_name}%'"
+        multiple_result = await db_pool.execute_query(multiple)
+        message=""
+        buttons = []
+        for item in multiple_result:
+            message += f"id: {item[0]}, Title: {item[1]}, Year: {item[2]}, Rating: {item[3]}\n\n"
+            buttons.append([InlineKeyboardButton((item[0]), callback_data=str(item))])
+        reply_markup = InlineKeyboardMarkup(buttons)
+        reply_message = f"Multiple movies found. Please choose one:\n {message}\n use /searchID"
+
+
+    logging.info("Update: " + str(update))
+    logging.info("context: " + str(context))
+    await update.message.reply_text(reply_message, reply_markup=reply_markup)
 
 
 def convert_to_human_readable(data):
@@ -77,6 +142,10 @@ def convert_to_human_readable(data):
         result += f"Rating: {item[6]}\n\n"
     return result
 
+async def start(update: Update, context: CallbackContext):
+    await db_pool.check_if_user_exists(update.message)
+    reply_text = "Greeting! I'm a Movie & TV info chatbot 🤖\n\n"
+    await update.message.reply_text(reply_text)
 
 if __name__ == '__main__':
     main()
