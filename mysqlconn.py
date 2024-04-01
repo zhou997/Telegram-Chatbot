@@ -66,7 +66,7 @@ class Database:
         sql = "SELECT * FROM reviews WHERE user_id=%s and media_id=%s"
         cursor.execute(sql, (user.id,title_id))
         result = cursor.fetchall()
-        if len(result) > 1:
+        if len(result) >= 1:
             exists = True
         else:
             exists = False

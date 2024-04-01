@@ -206,10 +206,16 @@ async def comt_button_click(update: Update, context: CallbackContext) -> None:
     option = query.data.split('>')[1].split('/')[0]
     title =  query.data.split('>')[0]
     title_id = query.data.split('/')[1]
+    user_id = query.from_user.id
     # Edit the existing message to update the reply based on the button clicked
     reply_message = ''
     if option == 'com_0':
-        reply_message = f'View Comments for {title}:\n'
+        info = f"select comments FROM reviews WHERE user_id = '{user_id}' and media_id='{title_id}' "
+        result =await db_pool.execute_query(info)
+        if len(result) == 0:
+            reply_message="You haven't written a comment yet, please add it"
+        else:
+            reply_message = f'View Comments for {title}:\n {result[0]}'
 
     elif option == 'com_1':
         reply_message = f'Add your Comment for {title}:\n'
@@ -219,7 +225,10 @@ async def comt_button_click(update: Update, context: CallbackContext) -> None:
         return WAIT_COMT
 
     elif option == 'com_2':
-        reply_message = f'Delete your Comment for {title}:\n'
+        reply_message = f'Delete your Comment for {title} finish.\n'
+        user_id = query.from_user.id
+        info = f"DELETE FROM reviews WHERE user_id = '{user_id}' "
+        await db_pool.execute_query(info,True)
 
     await query.answer()
     await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
