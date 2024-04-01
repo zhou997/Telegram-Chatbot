@@ -21,11 +21,13 @@ class Database:
     def get_connection(self):
         return self.pool.get_connection()
 
-    async def execute_query(self, query):
+    async def execute_query(self, query, insert=False):
         db_conn = self.pool.get_connection()
         cursor = db_conn.cursor()
         try:
             await asyncio.get_event_loop().run_in_executor(None, cursor.execute, query)
+            if insert:
+                db_conn.commit()
             result = await asyncio.get_event_loop().run_in_executor(None, cursor.fetchall)
             return result
         except Exception as err:

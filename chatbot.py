@@ -136,7 +136,7 @@ async def search(update: Update, context: CallbackContext) -> None:
             [InlineKeyboardButton("View Comments", callback_data=f'{title}>com_0/{title_id}')],
             [InlineKeyboardButton("Add Comment", callback_data=f'{title}>com_1/{title_id}')]
         ]
-        if True:
+        if await db_pool.check_if_user_reviews(update.message, int(title_id)):
             comt_keyboard.append(
                 [InlineKeyboardButton("Delete my Comment", callback_data=f'{title}>com_2/{title_id}')])
         reply_message = convert_to_human_readable(result)
@@ -213,6 +213,7 @@ async def comt_button_click(update: Update, context: CallbackContext) -> None:
 
     elif option == 'com_1':
         reply_message = f'Add your Comment for {title}:\n'
+        context.user_data["title_id"] = title_id
         await query.answer()
         await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
         return WAIT_COMT
@@ -297,7 +298,10 @@ async def handle_find_input(update: Update, context: CallbackContext):
     return WAIT_INPUT
 
 async def handle_comt_input(update: Update, context: CallbackContext):
-    message = update.message.text
+    message = update.message
+    title_id = context.user_data["title_id"]
+    await db_pool.execute_query(
+        f'INSERT INTO reviews(media_id, user_id, comments) VALUES({title_id},{message.from_user.id},\'{message.text}\')', True)
     await update.message.reply_text('comment success!')
     return ConversationHandler.END
 
