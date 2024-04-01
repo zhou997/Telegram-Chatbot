@@ -50,7 +50,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler('search', search))
     app.add_handler(CommandHandler('searchID', searchID))
-    app.add_handler(CallbackQueryHandler(multiple_button))
+    app.add_handler(CallbackQueryHandler(multiple_button, pattern=r's_(\d{1,2})'))
     app.add_handler(CommandHandler('rec', recommendHandler))
     app.add_handler(CallbackQueryHandler(rec_button_click, pattern='rec_\d'))
 
@@ -136,11 +136,12 @@ async def search(update: Update, context: CallbackContext) -> None:
         buttons = []
         for item in multiple_result:
             message += f"id: {item[0]}, Title: {item[1]}, Year: {item[2]}, Rating: {item[3]}\n\n"
-            buttons.append([InlineKeyboardButton((item[0]), callback_data=str(item))])
+            buttons.append([InlineKeyboardButton((item[0]), callback_data=str(f's_{item[0]}'))])
         reply_markup = InlineKeyboardMarkup(buttons)
         reply_message = f"Multiple movies found. Please choose one:\n {message}\n choose:"
     else:
-        await update.message.reply_text("Please provide a movie name to search.")
+        reply_message = 'Please provide a movie name to search.'
+        reply_markup = None
 
 
     logging.info("Update: " + str(update))
@@ -150,10 +151,8 @@ async def search(update: Update, context: CallbackContext) -> None:
 
 async def multiple_button(update, context):
     query = update.callback_query
-    selected_data = query.data
-    selected_data = selected_data.strip('()')
-    selected_data=selected_data.split(',')
-    info = f"SELECT * FROM media_content WHERE id = '{int(selected_data[0])}'"
+    selected_data = query.data.split('_')[1]
+    info = f"SELECT * FROM media_content WHERE id = '{int(selected_data)}'"
     result = await db_pool.execute_query(info)
     reply_message = convert_to_human_readable(result)
     await query.answer()
