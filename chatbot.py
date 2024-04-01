@@ -15,7 +15,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logging.getLogger("httpx").setLevel(logging.WARNING)
 db_pool = Database()
 
-START, WAIT_INPUT, WAIT_CHAT = range(3)
+START, WAIT_INPUT, WAIT_CHAT, WAIT_COMT = range(4)
 
 async def equiped_chatgpt(update, context, is_free_chat=True):
     await db_pool.check_if_user_exists(update.message)
@@ -55,17 +55,19 @@ def main():
     app.add_handler(CallbackQueryHandler(multiple_button, pattern=r's_(\d{1,2})'))
     app.add_handler(CommandHandler('rec', recommendHandler))
     app.add_handler(CallbackQueryHandler(rec_button_click, pattern='rec_\d'))
-    app.add_handler(CallbackQueryHandler(comt_button_click, pattern='.+?>com_\d+'))
+    comm_button_handler = CallbackQueryHandler(comt_button_click, pattern='.+?>com_\d+')
+    # app.add_handler(comm_button_handler)
 
     global chatgpt
     chatgpt = ChatGPTHKBU()
     chatgpt_handler = MessageHandler(filters.TEXT & (~filters.COMMAND),
                                      equiped_chatgpt)
     conv_handler_find = ConversationHandler(
-        entry_points=[CommandHandler('find', findMovieByPrompt), CommandHandler('chat', enterChat)],
+        entry_points=[CommandHandler('find', findMovieByPrompt), CommandHandler('chat', enterChat), comm_button_handler],
         states={
             WAIT_INPUT: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_find_input)],
-            WAIT_CHAT: [chatgpt_handler]
+            WAIT_CHAT: [chatgpt_handler],
+            WAIT_COMT: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_comt_input)]
         },
         fallbacks=[CommandHandler('exit', exit_conversation)]
     )
@@ -128,8 +130,17 @@ async def search(update: Update, context: CallbackContext) -> None:
     result = await db_pool.execute_query(query)
 
     if media_name and len(result) == 1:
+        title = result[0][1]
+        title_id = result[0][0]
+        comt_keyboard = [
+            [InlineKeyboardButton("View Comments", callback_data=f'{title}>com_0/{title_id}')],
+            [InlineKeyboardButton("Add Comment", callback_data=f'{title}>com_1/{title_id}')]
+        ]
+        if True:
+            comt_keyboard.append(
+                [InlineKeyboardButton("Delete my Comment", callback_data=f'{title}>com_2/{title_id}')])
         reply_message = convert_to_human_readable(result)
-        reply_markup=None
+        reply_markup=InlineKeyboardMarkup(comt_keyboard)
     elif media_name and len(result) == 0:
         reply_message = 'Movie not found'
         reply_markup=None
@@ -204,6 +215,9 @@ async def comt_button_click(update: Update, context: CallbackContext) -> None:
 
     elif option == 'com_1':
         reply_message = f'Add your Comment for {title}:\n'
+        await query.answer()
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
+        return WAIT_COMT
 
     elif option == 'com_2':
         reply_message = f'Delete your Comment for {title}:\n'
@@ -244,8 +258,8 @@ async def enterChat(update: Update, context: CallbackContext):
 
 rec_keyboard = [
     [InlineKeyboardButton("All", callback_data='rec_0')],
-    [InlineKeyboardButton("Action", callback_data='rec_1')],
-    [InlineKeyboardButton("Sci-fi", callback_data='rec_2')],
+    [InlineKeyboardButton("Sci-fi", callback_data='rec_1')],
+    [InlineKeyboardButton("Action", callback_data='rec_2')],
     [InlineKeyboardButton("Horror", callback_data='rec_3')]
 ]
 
@@ -283,6 +297,11 @@ async def handle_find_input(update: Update, context: CallbackContext):
     reply_message = reply_message + "\nenter /exit to exit."
     await update.message.reply_text(f'{reply_message}')
     return WAIT_INPUT
+
+async def handle_comt_input(update: Update, context: CallbackContext):
+    message = update.message.text
+    await update.message.reply_text('comment success!')
+    return ConversationHandler.END
 
 
 async def default_message(update: Update, context: CallbackContext):
