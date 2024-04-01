@@ -1,3 +1,4 @@
+import re
 from telegram import Update
 from telegram.ext import (CommandHandler, MessageHandler,
                           CallbackContext, ApplicationBuilder, filters, ConversationHandler, CallbackQueryHandler)
@@ -53,6 +54,7 @@ def main():
     app.add_handler(CallbackQueryHandler(multiple_button, pattern=r's_(\d{1,2})'))
     app.add_handler(CommandHandler('rec', recommendHandler))
     app.add_handler(CallbackQueryHandler(rec_button_click, pattern='rec_\d'))
+    app.add_handler(CallbackQueryHandler(comt_button_click, pattern='.+?>com_\d+'))
 
     global chatgpt
     chatgpt = ChatGPTHKBU()
@@ -117,6 +119,7 @@ async def searchID(update: Update, context: CallbackContext) -> None:
 
 
 async def search(update: Update, context: CallbackContext) -> None:
+    await db_pool.check_if_user_exists(update.message)
     media_name = ' '.join(context.args)
 
     # Query the database for the movie information based on the movie name
@@ -155,8 +158,37 @@ async def multiple_button(update, context):
     info = f"SELECT * FROM media_content WHERE id = '{int(selected_data)}'"
     result = await db_pool.execute_query(info)
     reply_message = convert_to_human_readable(result)
+    title = ''
+    match =  re.search(r'Title:\s*([^\n]*)', reply_message)
+    if match:
+        title = match.group(1)
+    # await query.answer()
+    comt_keyboard = [
+        [InlineKeyboardButton("View Comments", callback_data=f'{title}>com_0/{selected_data}')],
+        [InlineKeyboardButton("Add Comment", callback_data=f'{title}>com_1/{selected_data}')]
+    ]
+    if True:
+        comt_keyboard.append([InlineKeyboardButton("Delete my Comment", callback_data=f'{title}>com_2/{selected_data}')])
+    await query.edit_message_text(text=f"Movie of your choice:\n{reply_message}",reply_markup=InlineKeyboardMarkup(comt_keyboard))
+
+async def comt_button_click(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    option = query.data.split('>')[1].split('/')[0]
+    title =  query.data.split('>')[0]
+    title_id = query.data.split('/')[1]
+    # Edit the existing message to update the reply based on the button clicked
+    reply_message = ''
+    if option == 'com_0':
+        reply_message = f'View Comments for {title}:\n'
+
+    elif option == 'com_1':
+        reply_message = f'Add your Comment for {title}:\n'
+
+    elif option == 'com_2':
+        reply_message = f'Delete your Comment for {title}:\n'
+
     await query.answer()
-    await query.edit_message_text(text=f"Movie of your choice:\n{reply_message}")
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
 
 def convert_to_human_readable(data):
     result = ""
