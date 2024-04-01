@@ -134,12 +134,10 @@ async def search(update: Update, context: CallbackContext) -> None:
         reply_message = 'Movie not found'
         reply_markup=None
     elif media_name and len(result) > 1:
-        multiple = f"SELECT id,title,release_year,rating FROM media_content WHERE title LIKE '%{media_name}%'"
-        multiple_result = await db_pool.execute_query(multiple)
         message=""
         buttons = []
-        for item in multiple_result:
-            message += f"id: {item[0]}, Title: {item[1]}, Year: {item[2]}, Rating: {item[3]}\n\n"
+        for item in result:
+            message += f"id: {item[0]}, Title: {item[1]}, Year: {item[2]}, Rating: {item[6]}\n\n"
             buttons.append([InlineKeyboardButton((item[0]), callback_data=str(f's_{item[0]}'))])
         reply_markup = InlineKeyboardMarkup(buttons)
         reply_message = f"Multiple movies found. Please choose one:\n {message}\n choose:"
@@ -188,7 +186,7 @@ async def multiple_button(update, context):
         [InlineKeyboardButton("View Comments", callback_data=f'{title}>com_0/{selected_data}')],
         [InlineKeyboardButton("Add Comment", callback_data=f'{title}>com_1/{selected_data}')]
     ]
-    if True:
+    if await db_pool.check_if_user_reviews(update.callback_query,int(selected_data)):
         comt_keyboard.append([InlineKeyboardButton("Delete my Comment", callback_data=f'{title}>com_2/{selected_data}')])
     await query.edit_message_text(text=f"Movie of your choice:\n{reply_message}",reply_markup=InlineKeyboardMarkup(comt_keyboard))
 

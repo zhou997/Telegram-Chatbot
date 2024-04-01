@@ -56,3 +56,16 @@ class Database:
         finally:
             cursor.close()
             db_conn.close()
+
+    async def check_if_user_reviews(self, message,title_id):
+        user = message.from_user
+        db_conn = self.pool.get_connection()
+        cursor = db_conn.cursor()
+        sql = "SELECT * FROM reviews WHERE user_id=%s and media_id=%s"
+        cursor.execute(sql, (user.id,title_id))
+        result = cursor.fetchall()
+        if len(result) > 1:
+            exists = True
+        else:
+            exists = False
+        return exists
