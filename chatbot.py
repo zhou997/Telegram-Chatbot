@@ -1,6 +1,6 @@
 from telegram import Update
 from telegram.ext import (CommandHandler, MessageHandler,
-                          CallbackContext, ApplicationBuilder, filters)
+                          CallbackContext, ApplicationBuilder, filters, ConversationHandler, CallbackQueryHandler)
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import logging, os
 from ChatGPTHKBU import ChatGPTHKBU
@@ -14,11 +14,12 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logging.getLogger("httpx").setLevel(logging.WARNING)
 db_pool = Database()
 
+START, WAIT_INPUT, WAIT_CHAT = range(3)
 
-async def equiped_chatgpt(update, context, is_free_chat=False):
+async def equiped_chatgpt(update, context, is_free_chat=True):
     await db_pool.check_if_user_exists(update.message)
     global chatgpt
-    if prompt_filter(update.message.text) or is_free_chat:
+    if is_free_chat or prompt_filter(update.message.text):
         reply_message = chatgpt.submit(update.message.text)
         logging.info("Update: " + str(update))
         logging.info("context: " + str(context))
@@ -26,6 +27,7 @@ async def equiped_chatgpt(update, context, is_free_chat=False):
     else:
         await context.bot.send_message(chat_id=update.effective_chat.id,
                                        text="Opps, No data found for the message.\nPlease ask Movie or TV related questions.")
+    return WAIT_CHAT
 
 
 def prompt_filter(text):
@@ -48,12 +50,22 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler('search', search))
     app.add_handler(CommandHandler('searchID', searchID))
-
+    app.add_handler(CommandHandler('rec', recommendHandler))
+    app.add_handler(CallbackQueryHandler(rec_button_click, pattern='rec_\d'))
     global chatgpt
     chatgpt = ChatGPTHKBU()
     chatgpt_handler = MessageHandler(filters.TEXT & (~filters.COMMAND),
                                      equiped_chatgpt)
-    app.add_handler(chatgpt_handler)
+    conv_handler_find = ConversationHandler(
+        entry_points=[CommandHandler('find', findMovieByPrompt), CommandHandler('chat', enterChat)],
+        states={
+            WAIT_INPUT: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_find_input)],
+            WAIT_CHAT: [chatgpt_handler]
+        },
+        fallbacks=[CommandHandler('exit', exit_conversation)]
+    )
+    app.add_handler(conv_handler_find)
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), default_message))
     # To start the bot:
     app.run_polling()
 
@@ -125,7 +137,6 @@ async def search(update: Update, context: CallbackContext) -> None:
         reply_markup = InlineKeyboardMarkup(buttons)
         reply_message = f"Multiple movies found. Please choose one:\n {message}\n use /searchID"
 
-
     logging.info("Update: " + str(update))
     logging.info("context: " + str(context))
     await update.message.reply_text(reply_message, reply_markup=reply_markup)
@@ -146,6 +157,72 @@ async def start(update: Update, context: CallbackContext):
     await db_pool.check_if_user_exists(update.message)
     reply_text = "Greeting! I'm a Movie & TV info chatbot 🤖\n\n"
     await update.message.reply_text(reply_text)
+
+
+async def findMovieByPrompt(update: Update, context: CallbackContext):
+    await db_pool.check_if_user_exists(update.message)
+    await update.message.reply_text(
+        'you can use /exit to exit.\nHello! Please enter the info for the Movie or TV shows you want to find:')
+    return WAIT_INPUT
+
+
+async def enterChat(update: Update, context: CallbackContext):
+    await db_pool.check_if_user_exists(update.message)
+    await update.message.reply_text('you can use /exit to exit.\nHello, ChatGPT here.\nfeel free to chat with me:')
+    return WAIT_CHAT
+
+
+rec_keyboard = [
+    [InlineKeyboardButton("All", callback_data='rec_0')],
+    [InlineKeyboardButton("Action", callback_data='rec_1')],
+    [InlineKeyboardButton("Sci-fi", callback_data='rec_2')],
+    [InlineKeyboardButton("Horror", callback_data='rec_3')]
+]
+
+
+async def recommendHandler(update: Update, context: CallbackContext):
+    await db_pool.check_if_user_exists(update.message)
+    message_text = "Hello! Please choose one of the following options:"
+    await update.message.reply_text(message_text, reply_markup=InlineKeyboardMarkup(rec_keyboard))
+
+
+async def rec_button_click(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    option = query.data
+    prompt = ("Please provide straightforward responses without using apologies. Be concise. "
+              "Recommend me 5 movies or tv_series in the format of \"Title:name\nYear:year\nCategory:(Movie or TV Series)\nGenre:genre\nDescription:description\nRating:IMDB rating\"")
+    # Edit the existing message to update the reply based on the button clicked
+    if option == 'rec_1':
+        prompt = prompt + "genre Sci-fi"
+    elif option == 'rec_2':
+        prompt = prompt + "genre Action"
+    elif option == 'rec_3':
+        prompt = prompt + "genre Horror"
+
+    reply_text = chatgpt.submit(prompt)
+    await query.edit_message_text(text=reply_text, reply_markup=InlineKeyboardMarkup(rec_keyboard))
+
+
+async def handle_find_input(update: Update, context: CallbackContext):
+    global chatgpt
+    message = update.message.text
+    message = ("Please provide straightforward responses without using apologies. Be concise. "
+               "I want to find movie or tv_series in the format of \"Title:name\nYear:year\nCategory:(Movie or TV Series)\nGenre:genre\nDescription:description\nRating:IMDB rating\""
+               "by information below") + message
+    reply_message = chatgpt.submit(message)
+    reply_message = reply_message + "\nenter /exit to exit."
+    await update.message.reply_text(f'{reply_message}')
+    return WAIT_INPUT
+
+
+async def default_message(update: Update, context: CallbackContext):
+    await update.message.reply_text("Sorry, I don't understand that.\nPlease use /start to view commands.")
+
+
+async def exit_conversation(update: Update, context: CallbackContext):
+    await update.message.reply_text('Exited.\nPlease use /start to view commands.')
+    return ConversationHandler.END
+
 
 if __name__ == '__main__':
     main()
