@@ -6,7 +6,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import logging, os
 from ChatGPTHKBU import ChatGPTHKBU
 from dotenv import load_dotenv
-
+import sys
 from mysqlconn import Database
 
 load_dotenv()
@@ -51,6 +51,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler('search', search))
     app.add_handler(CommandHandler('searchID', searchID))
+    app.add_handler(CommandHandler('search_review', search_review))
     app.add_handler(CallbackQueryHandler(multiple_button, pattern=r's_(\d{1,2})'))
     app.add_handler(CommandHandler('rec', recommendHandler))
     app.add_handler(CallbackQueryHandler(rec_button_click, pattern='rec_\d'))
@@ -151,6 +152,26 @@ async def search(update: Update, context: CallbackContext) -> None:
     logging.info("context: " + str(context))
     await update.message.reply_text(reply_message, reply_markup=reply_markup)
 
+async def search_review(update: Update, context: CallbackContext) -> None:
+    mediaid = ' '.join(context.args)
+
+    query = f"SELECT * FROM reviews WHERE media_id LIKE '%{mediaid}%'"
+    result = await db_pool.execute_query(query)
+    if mediaid and len(result) == 1:
+        reply_message = convert_to_human_readable(result)
+    elif mediaid and len(result) == 0:
+        reply_message = 'Movie not found'
+    elif mediaid and len(result) > 1:
+        multiple = f"SELECT id,media_id,user_id,comments,rating FROM reviews WHERE media_id LIKE '%{mediaid}%'"
+        multiple_result = await db_pool.execute_query(multiple)
+        message=""
+        for item in multiple_result:
+            if sys.getsizeof(item[3].encode('utf-8')) > 2048:
+               message += f"id: {item[0]}, Media_id: {item[1]}, User_id: {item[2]}, Comments: {item[3][50]+'...'}, Rating: {item[4]}\n\n"
+            else:
+               message += f"id: {item[0]}, Media_id: {item[1]}, User_id: {item[2]}, Comments: {item[3]}, Rating: {item[4]}\n\n"
+    reply_message = f"Comments found:\n {message}\n"
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
 
 async def multiple_button(update, context):
     query = update.callback_query
