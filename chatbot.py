@@ -136,7 +136,7 @@ async def search(update: Update, context: CallbackContext) -> None:
             [InlineKeyboardButton("View Comments", callback_data=f'{title}>com_0/{title_id}')],
             [InlineKeyboardButton("Add Comment", callback_data=f'{title}>com_1/{title_id}')]
         ]
-        if await db_pool.check_if_user_reviews(update.message, int(title_id)):
+        if True:
             comt_keyboard.append(
                 [InlineKeyboardButton("Delete my Comment", callback_data=f'{title}>com_2/{title_id}')])
         reply_message = convert_to_human_readable(result)
@@ -197,7 +197,7 @@ async def multiple_button(update, context):
         [InlineKeyboardButton("View Comments", callback_data=f'{title}>com_0/{selected_data}')],
         [InlineKeyboardButton("Add Comment", callback_data=f'{title}>com_1/{selected_data}')]
     ]
-    if await db_pool.check_if_user_reviews(update.callback_query,int(selected_data)):
+    if True:
         comt_keyboard.append([InlineKeyboardButton("Delete my Comment", callback_data=f'{title}>com_2/{selected_data}')])
     await query.edit_message_text(text=f"Movie of your choice:\n{reply_message}",reply_markup=InlineKeyboardMarkup(comt_keyboard))
 
@@ -215,7 +215,7 @@ async def comt_button_click(update: Update, context: CallbackContext) -> None:
         if len(result) == 0:
             reply_message="You haven't written a comment yet, please add it"
         else:
-            reply_message = f'View Comments for {title}:\n {result[0]}'
+            reply_message = f'View Comments for {title}:\n {result}'
 
     elif option == 'com_1':
         reply_message = f'Add your Comment for {title}:\n'
@@ -227,7 +227,7 @@ async def comt_button_click(update: Update, context: CallbackContext) -> None:
     elif option == 'com_2':
         reply_message = f'Delete your Comment for {title} finish.\n'
         user_id = query.from_user.id
-        info = f"DELETE FROM reviews WHERE user_id = '{user_id}' "
+        info = f"DELETE FROM reviews WHERE user_id = '{user_id}' and media_id='{title_id}'"
         await db_pool.execute_query(info,True)
 
     await query.answer()
