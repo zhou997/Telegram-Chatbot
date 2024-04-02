@@ -210,10 +210,10 @@ async def comt_button_click(update: Update, context: CallbackContext) -> None:
     # Edit the existing message to update the reply based on the button clicked
     reply_message = ''
     if option == 'com_0':
-        info = f"select comments FROM reviews WHERE user_id = '{user_id}' and media_id='{title_id}' "
+        info = f"select date_format(review_date,'%Y-%m-%d'),comments FROM reviews WHERE media_id='{title_id}' order by review_date limit 3 "
         result =await db_pool.execute_query(info)
         if len(result) == 0:
-            reply_message="You haven't written a comment yet, please add it"
+            reply_message="No comment, please add it"
         else:
             reply_message = f'View Comments for {title}:\n {result}'
 
@@ -247,7 +247,7 @@ def convert_to_human_readable(data):
 
 async def start(update: Update, context: CallbackContext):
     await db_pool.check_if_user_exists(update.message)
-    reply_text = ("Greeting! I'm a Movie & TV info chatbot 🤖\nManual:\n/start	Getting Started, greeting and show available commands.\n\n/top	TOP 5 titles, return top 5 highest rating records from db.\n\n/search <keyword> 	Search Title, Search one or many records from DB by the keyword.\nUser can View, Add, Delete comments by buttons.\n\n/rec	Movie Recommendations, return 5 movie or tv series recommendations, with button interactive.\n\n/find	Find Title by Description, starting a conversation for user to find movie or tv series by description.\n\nExit the conversation by /exit.\n\n/chat	GPT Chat, starts a conversation for user to chat with ChatGPT directly.\n\nExit the conversation by /exit.")
+    reply_text = ("Greeting! I'm a Movie & TV info chatbot 🤖\nManual:\n/start	Getting Started, greeting and show available commands.\n\n/top	TOP 5 titles, return top 5 highest rating records from db.\n\n/search <keyword> 	Search Title, Search one or many records from DB by the keyword.\nUser can View, Add, Delete comments by buttons.\n\n/search_review <keyword> search the media review from DB by the keyword. \n\n/rec	Movie Recommendations, return 5 movie or tv series recommendations, with button interactive.\n\n/find	Find Title by Description, starting a conversation for user to find movie or tv series by description.\n\nExit the conversation by /exit.\n\n/chat	GPT Chat, starts a conversation for user to chat with ChatGPT directly.\n\nExit the conversation by /exit.")
     await update.message.reply_text(reply_text)
 
 
