@@ -1,5 +1,5 @@
 User needs to create .env file and add some information to the file：
-TELEGRAM_ACCESS_TOKEN=XXX
+TELEGRAM_ACCESS_TOKEN=XXX\n
 MYSQL_USER=XXX
 MYSQL_PASSWORD=XXX
 MYSQL_HOST=XXX
