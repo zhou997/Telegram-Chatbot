@@ -247,7 +247,8 @@ def convert_to_human_readable(data):
 
 async def start(update: Update, context: CallbackContext):
     await db_pool.check_if_user_exists(update.message)
-    reply_text = "Greeting! I'm a Movie & TV info chatbot 🤖\n\n"
+    reply_text = ("Greeting! I'm a Movie & TV info chatbot 🤖\n"
+                  "Manual:\n/start	Getting Started, greeting and show available commands.\n\n/top	TOP 5 titles, return top 5 highest rating records from db.\n\n/search <keyword> 	Search Title, Search one or many records from DB by the keyword.\nUser can View, Add, Delete comments by buttons.\n\n/rec	Movie Recommendations, return 5 movie or tv series recommendations, with button interactive.\n\n/find	Find Title by Description, starting a conversation for user to find movie or tv series by description.\n\nExit the conversation by /exit.\n\n/chat	GPT Chat, starts a conversation for user to chat with ChatGPT directly.\n\nExit the conversation by /exit.")
     await update.message.reply_text(reply_text)
 
 
