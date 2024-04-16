@@ -288,7 +288,7 @@ async def rec_button_click(update: Update, context: CallbackContext) -> None:
         prompt = prompt + "genre Action"
     elif option == 'rec_3':
         prompt = prompt + "genre Horror"
-
+    await query.edit_message_text(text="loading...")
     reply_text = chatgpt.submit(prompt)
     await query.edit_message_text(text=reply_text, reply_markup=InlineKeyboardMarkup(rec_keyboard))
 
