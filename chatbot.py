@@ -76,7 +76,6 @@ def main():
     # To start the bot:
     app.run_polling()
 
-
 async def help_command(update: Update, context: CallbackContext) -> None:
     await db_pool.check_if_user_exists(update.message)
     """Send a message when the command /help is issued."""
