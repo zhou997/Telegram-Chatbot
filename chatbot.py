@@ -42,6 +42,26 @@ def prompt_filter(text):
     else:
         return False
 
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+def create_lollipop_chart(df):
+    # Set up the aesthetics for the plot
+    sns.set_style("whitegrid")
+
+    # Draw plot
+    plt.figure(figsize=(14, 10))
+    plt.hlines(y=df['Title'], xmin=0, xmax=df['Rating'], color='skyblue')
+    plt.plot(df['Rating'], df['Title'], "o")
+
+    # Add titles and labels
+    plt.title('Top Rated Shows and Movies', loc='left')
+    plt.xlabel('IMDB Rating')
+    plt.ylabel('Title')
+
+    plt.savefig('lollipop_chart.png', bbox_inches='tight', dpi=300)
+
+
 
 def main():
     app = ApplicationBuilder().token(os.getenv('TELEGRAM_ACCESS_TOKEN')).concurrent_updates(True).build()
@@ -98,6 +118,13 @@ async def top(update: Update, context: CallbackContext) -> None:
     await db_pool.check_if_user_exists(update.message)
     try:
         result = await db_pool.execute_query("SELECT * FROM media_content order by rating desc limit 5")
+        columns = ['Rank', 'Title', 'Year', 'Seasons', 'Genre', 'Description', 'Rating', 'url']
+        df = pd.DataFrame(result, columns=columns)
+
+        # Sort the DataFrame by Rating (assuming we want to create a lollipop chart for ratings)
+        df.sort_values('Rating', ascending=False, inplace=True)
+        df.reset_index(drop=True, inplace=True)
+        create_lollipop_chart(df)
         if result:
             reply_message = convert_to_human_readable(result)
         else:
@@ -105,6 +132,8 @@ async def top(update: Update, context: CallbackContext) -> None:
         logging.info("Update: " + str(update))
         logging.info("context: " + str(context))
         await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
+        await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open("lollipop_chart.png",'rb'))
+
     except (IndexError, ValueError):
         await update.message.reply_text('Usage: /top')
 
