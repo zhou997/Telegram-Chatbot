@@ -1,4 +1,7 @@
 import re
+import subprocess
+import urllib
+
 from telegram import Update
 from telegram.ext import (CommandHandler, MessageHandler,
                           CallbackContext, ApplicationBuilder, filters, ConversationHandler, CallbackQueryHandler)
@@ -8,6 +11,9 @@ from ChatGPTHKBU import ChatGPTHKBU
 from dotenv import load_dotenv
 import sys
 from mysqlconn import Database
+from gtts import gTTS
+import speech_recognition as sr
+
 
 load_dotenv()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -30,6 +36,31 @@ async def equiped_chatgpt(update, context, is_free_chat=True):
                                        text="Opps, No data found for the message.\nPlease ask Movie or TV related questions.")
     return WAIT_CHAT
 
+async def get_voice(update: Update, context: CallbackContext):
+    # get basic info about the voice note file and prepare it for downloading
+    new_file =await context.bot.get_file(update.message.voice.file_id)
+    await db_pool.check_if_user_exists(update.message)
+    global chatgpt
+    if True or prompt_filter(update.message.text):
+        urllib.request.urlretrieve(new_file.file_path, filename="input.oga")
+        src_filename = 'input.oga'
+        dest_filename = 'output.wav'
+
+        process = subprocess.run(['ffmpeg', '-y', '-i', src_filename, dest_filename])
+        r = sr.Recognizer()
+        sample_call = sr.AudioFile('output.wav')
+        with sample_call as source:
+            audio_data = r.record(source)
+            text = r.recognize_google(audio_data)
+            message = text
+        reply_message = chatgpt.submit(message)
+        voiceobj = gTTS(text=reply_message, lang='en', slow=False, tld='com')
+        voiceobj.save('voice.mp3')
+        await context.bot.send_voice(chat_id=update.effective_chat.id, voice='voice.mp3')
+    else:
+        await context.bot.send_message(chat_id=update.effective_chat.id,
+                                       text="Opps, No data found for the message.\nPlease ask Movie or TV related questions.")
+    return WAIT_CHAT
 
 def prompt_filter(text):
     global chatgpt
@@ -82,11 +113,12 @@ def main():
     chatgpt = ChatGPTHKBU()
     chatgpt_handler = MessageHandler(filters.TEXT & (~filters.COMMAND),
                                      equiped_chatgpt)
+    chatgpt_voice_handler = MessageHandler(filters.VOICE, get_voice)
     conv_handler_find = ConversationHandler(
         entry_points=[CommandHandler('find', findMovieByPrompt), CommandHandler('chat', enterChat), comm_button_handler],
         states={
             WAIT_INPUT: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_find_input)],
-            WAIT_CHAT: [chatgpt_handler],
+            WAIT_CHAT: [chatgpt_handler,chatgpt_voice_handler],
             WAIT_COMT: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_comt_input)]
         },
         fallbacks=[CommandHandler('exit', exit_conversation)]
@@ -95,7 +127,6 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), default_message))
     # To start the bot:
     app.run_polling()
-
 
 async def help_command(update: Update, context: CallbackContext) -> None:
     await db_pool.check_if_user_exists(update.message)
@@ -191,23 +222,21 @@ async def search(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(reply_message, reply_markup=reply_markup)
 
 async def search_review(update: Update, context: CallbackContext) -> None:
-    mediaid = ' '.join(context.args)
+    medianame = ' '.join(context.args)
 
-    query = f"SELECT * FROM reviews WHERE media_id LIKE '%{mediaid}%'"
+    query = f""" select b.title,a.comments,date_format(a.review_date,'%Y-%m-%d') FROM reviews a
+             left join media_content b on a.media_id=b.id
+             WHERE b.title LIKE '%{medianame}%' order by review_date """
     result = await db_pool.execute_query(query)
-    if mediaid and len(result) == 1:
-        reply_message = convert_to_human_readable(result)
-    elif mediaid and len(result) == 0:
-        reply_message = 'Movie not found'
-    elif mediaid and len(result) > 1:
-        multiple = f"SELECT id,media_id,user_id,comments,rating FROM reviews WHERE media_id LIKE '%{mediaid}%'"
-        multiple_result = await db_pool.execute_query(multiple)
+    if medianame and len(result) == 0:
+        reply_message = 'Movie comments not found'
+    else:
         message=""
-        for item in multiple_result:
-            if sys.getsizeof(item[3].encode('utf-8')) > 2048:
-               message += f"id: {item[0]}, Media_id: {item[1]}, User_id: {item[2]}, Comments: {item[3][50]+'...'}, Rating: {item[4]}\n\n"
+        for item in result:
+            if sys.getsizeof(item[2].encode('utf-8')) > 2048:
+               message += f"Moviename: {item[0]}\n\n Comments: {item[1]}\n\n date: {item[2][50]+'...'}\n\n"
             else:
-               message += f"id: {item[0]}, Media_id: {item[1]}, User_id: {item[2]}, Comments: {item[3]}, Rating: {item[4]}\n\n"
+               message += f"Moviename: {item[0]}\n\n Comments: {item[1]}\n\n date: {item[2]}\n\n"
     reply_message = f"Comments found:\n {message}\n"
     await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
 
@@ -319,7 +348,7 @@ async def rec_button_click(update: Update, context: CallbackContext) -> None:
         prompt = prompt + "genre Action"
     elif option == 'rec_3':
         prompt = prompt + "genre Horror"
-
+    await query.edit_message_text(text="loading...")
     reply_text = chatgpt.submit(prompt)
     await query.edit_message_text(text=reply_text, reply_markup=InlineKeyboardMarkup(rec_keyboard))
 
@@ -351,7 +380,6 @@ async def default_message(update: Update, context: CallbackContext):
 async def exit_conversation(update: Update, context: CallbackContext):
     await update.message.reply_text('Exited.\nPlease use /start to view commands.')
     return ConversationHandler.END
-
 
 if __name__ == '__main__':
     main()
