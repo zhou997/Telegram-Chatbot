@@ -12,3 +12,5 @@ ffmpeg
 soundfile
 urllib3
 matplotlib
+pandas
+seaborn
