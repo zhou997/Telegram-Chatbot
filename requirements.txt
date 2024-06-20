@@ -11,3 +11,4 @@ pydub
 ffmpeg
 soundfile
 urllib3
+matplotlib
