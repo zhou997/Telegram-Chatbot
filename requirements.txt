@@ -5,3 +5,9 @@ urllib3==1.26.18
 mysql-connector-python
 flask
 python-dotenv
+gTTS
+SpeechRecognition
+pydub
+ffmpeg
+soundfile
+urllib3

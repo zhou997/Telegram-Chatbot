@@ -1,4 +1,7 @@
 import re
+import subprocess
+import urllib
+
 from telegram import Update
 from telegram.ext import (CommandHandler, MessageHandler,
                           CallbackContext, ApplicationBuilder, filters, ConversationHandler, CallbackQueryHandler)
@@ -8,6 +11,9 @@ from ChatGPTHKBU import ChatGPTHKBU
 from dotenv import load_dotenv
 import sys
 from mysqlconn import Database
+from gtts import gTTS
+import speech_recognition as sr
+
 
 load_dotenv()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -30,6 +36,31 @@ async def equiped_chatgpt(update, context, is_free_chat=True):
                                        text="Opps, No data found for the message.\nPlease ask Movie or TV related questions.")
     return WAIT_CHAT
 
+async def get_voice(update: Update, context: CallbackContext):
+    # get basic info about the voice note file and prepare it for downloading
+    new_file =await context.bot.get_file(update.message.voice.file_id)
+    await db_pool.check_if_user_exists(update.message)
+    global chatgpt
+    if True or prompt_filter(update.message.text):
+        urllib.request.urlretrieve(new_file.file_path, filename="input.oga")
+        src_filename = 'input.oga'
+        dest_filename = 'output.wav'
+
+        process = subprocess.run(['ffmpeg', '-y', '-i', src_filename, dest_filename])
+        r = sr.Recognizer()
+        sample_call = sr.AudioFile('output.wav')
+        with sample_call as source:
+            audio_data = r.record(source)
+            text = r.recognize_google(audio_data)
+            message = text
+        reply_message = chatgpt.submit(message)
+        voiceobj = gTTS(text=reply_message, lang='en', slow=False, tld='com')
+        voiceobj.save('voice.mp3')
+        await context.bot.send_voice(chat_id=update.effective_chat.id, voice='voice.mp3')
+    else:
+        await context.bot.send_message(chat_id=update.effective_chat.id,
+                                       text="Opps, No data found for the message.\nPlease ask Movie or TV related questions.")
+    return WAIT_CHAT
 
 def prompt_filter(text):
     global chatgpt
@@ -62,11 +93,12 @@ def main():
     chatgpt = ChatGPTHKBU()
     chatgpt_handler = MessageHandler(filters.TEXT & (~filters.COMMAND),
                                      equiped_chatgpt)
+    chatgpt_voice_handler = MessageHandler(filters.VOICE, get_voice)
     conv_handler_find = ConversationHandler(
         entry_points=[CommandHandler('find', findMovieByPrompt), CommandHandler('chat', enterChat), comm_button_handler],
         states={
             WAIT_INPUT: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_find_input)],
-            WAIT_CHAT: [chatgpt_handler],
+            WAIT_CHAT: [chatgpt_handler,chatgpt_voice_handler],
             WAIT_COMT: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_comt_input)]
         },
         fallbacks=[CommandHandler('exit', exit_conversation)]
@@ -319,7 +351,6 @@ async def default_message(update: Update, context: CallbackContext):
 async def exit_conversation(update: Update, context: CallbackContext):
     await update.message.reply_text('Exited.\nPlease use /start to view commands.')
     return ConversationHandler.END
-
 
 if __name__ == '__main__':
     main()
